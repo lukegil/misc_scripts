@@ -61,4 +61,5 @@ for repo in $repos; do
 			  sed 's/[0-9] files changed, \([0-9]*\) insertions(+),/\1/g'`
 done
 
+lk
 commits=$(  2 files changed, 15 insertions(+), 4 deletions(-
