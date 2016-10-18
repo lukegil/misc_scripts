@@ -1,5 +1,5 @@
 import datetime, time, os
-import json, math
+import json, math, cProfile
 
 def file_to_dict(json_file):
     """ turns a json file into a dict """
@@ -12,9 +12,9 @@ def lat_long_diff(lat_long_1, lat_long_2):
     """
 
     # radians for arc AB
-    lat_diff = math.radians(math.fabs(lat_long_2[0]) - math.fabs(lat_long_1[0]))
+    lat_diff = math.radians(lat_long_2[0] - lat_long_1[0])
     # radians for arc AC
-    long_diff = math.radians(math.fabs(lat_long_2[1]) - math.fabs(lat_long_1[1]))
+    long_diff = math.radians(lat_long_2[1] - lat_long_1[1])
     # radius of earth
     radius = 6378100
     # Spherical law of cosines (cos of angle BAC == 0)
@@ -42,22 +42,48 @@ def update_farthest(location_obj, calendar_obj, home_coords):
 
 def process_file(start_date, end_date, file_path, home_coords):
     json_data = file_to_dict(file_path)
+    
     start_ts = time.mktime(start_date.timetuple())
     end_ts = time.mktime(end_date.timetuple())
     calendar_obj = {}
-
+    i = 0
+    j = 0
     for obj in json_data["locations"]:
+        i += 1
         location_obj = obj
         ts = int(location_obj["timestampMs"])/1000
         if (ts >= start_ts and ts < end_ts):
+            j += 1
             calendar_obj = update_farthest(location_obj, calendar_obj, home_coords)
-
+        
     return calendar_obj
 
-def dict_to_tbl(obj):
-    fs = ""
+def insert_data(tbl, new_item, sort_key):
+    """ tbl is a multidimensional list """
+    
+    tl = len(tbl)
+    if (tl == 0):
+        return [new_item]
+
+    for i in range(tl):
+
+        if (new_item[sort_key] <= tbl[i][sort_key]):
+            
+            nt = tbl[:i] + [new_item] + tbl[i:]
+            return tbl[:i] + [new_item] + tbl[i:]
+        
+    tbl.append(new_item)
+    return tbl
+
+def dict_to_tbl(obj, col):
+    """ turn dict to tbl, sort by col number """
+    nt = []
     for key in obj:
-        fs += "{}\t{}\n".format(key, obj[key])
+        nt = insert_data(nt, [key, obj[key]], col)
+
+    fs = ""
+    for i in nt:
+        fs += "{}\n".format("\t".join(map(str, i)))
     return fs
 
 
@@ -70,6 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("-f","--file", help="The filepath with the data", required=True)
     parser.add_argument("-u","--longitude", help="longitude of home address (in decimal degrees)", required=True, type=float)
     parser.add_argument("-l","--latitude", help="latitude of home address (in decimal degrees)", required=True, type=float)
+    parser.add_argument("-d","--distanceorder", help="order by distance ascending", required=False, action="store_true")
 
     args = parser.parse_args()
 
@@ -88,4 +115,10 @@ if __name__ == "__main__":
 
     home_coords = [args.latitude, args.longitude]
     result = process_file(start_time, end_time, json_file, home_coords)
-    print dict_to_tbl(result)
+
+    print "done with process_file"
+
+    if (args.distanceorder):
+        print dict_to_tbl(result, 1)
+    else:
+        print dict_to_tbl(result, 0)
