@@ -108,6 +108,25 @@ def sort_data(obj, col):
         nt = insert_data(nt, [key, obj[key]], col)
     return nt
 
+def fill_empty_dates(obj, start_date, end_date):
+    """ returns updated obj
+
+        obj - @param - {datestring : dist, datestring : dist...}
+            - @type - dict
+        start_date - @param - date to begin filling in from
+                   - @type - datetime object
+        end_date - @param - date to fill up until (exclusive)
+                 - @type - datetime object
+    """
+    cur_date = start_date
+    while (cur_date < end_date):
+        cur_str = datetime.datetime.strftime(cur_date, "%Y-%m-%d")
+        if (obj.get(cur_str) is None):
+            obj[cur_str] = 0
+        cur_date += datetime.timedelta(days=1)
+    return obj
+
+
 def convert_to_tsv(obj):
     """ turn list to tsv tbl """
 
@@ -151,11 +170,13 @@ if __name__ == "__main__":
 
     # read through the file, returning an unsorted list [[date, dist], [date, dist]]
     result = process_file(start_time, end_time, json_file, home_coords)
+    result = fill_empty_dates(result, start_time, end_time)
 
     if (args.distanceorder):
         result = sort_data(result, 1)
     else:
         result = sort_data(result, 0)
+
 
     if (args.format == "tsv"):
         result = convert_to_tsv(result)
