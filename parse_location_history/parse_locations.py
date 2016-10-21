@@ -168,6 +168,6 @@ if __name__ == "__main__":
             print "the directory {} does not exist, writing to stdout".format(d)
             print result
         f = open(f, "w")
-        f.write(result)
+        f.write(str(result))
     else:
         print result
