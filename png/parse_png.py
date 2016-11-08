@@ -9,7 +9,7 @@ def open_file(filepath):
 
 def is_png(data):
     first_eight = data[:8]
-    PNG_id = "89 50 4e 47 0d 0a 1a 0a"
+    PNG_id = "89 50 4e 47 0d 0a 1a 0a".replace("0x", "").lower()
     if (binascii.hexlify(first_eight) == PNG_id):
         return True
     return False
