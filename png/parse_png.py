@@ -2,6 +2,76 @@ import os, sys
 import binascii
 
 
+# Don't think I'll need this...
+# class PNGChunk(object):
+#     def __init__(self):
+#         self._length = int()
+#         self._hex_data = str()
+#         self._bin_data = str()
+#         self._crc = str()
+#
+#     @property
+#     def length(self):
+#         return self._length
+#
+#     @length.setter
+#     def length(self, val):
+#         self.check_type(val, int)
+#         self._length = val
+#
+#     @property
+#     def hex_data(self):
+#         return self._hex_data
+#
+#     @hex_data.setter
+#     def hex_data(self, val):
+#         self.check_type(val, str)
+#         self._hex_data = val
+#
+#     @property
+#     def bin_data(self):
+#         return self._bin_data
+#
+#     @bin_data.setter
+#     def bin_data(self, val):
+#         check_type(val, str)
+#         self._bin_data = val
+#
+#     @property
+#     def crc(self):
+#         return self._crc
+#
+#     @crc.setter
+#     def crc(self, val):
+#         check_type(val, str)
+#         self._crc = val
+#
+#     def check_type(self, val, ought):
+#         if (isinstance(val, ought)):
+#             return True
+#
+#         raise TypeError("""
+#                             Required type : {}
+#                             You passed type : {}
+#                             You passed value : {}
+#                         """.format(ought, val, type(val))
+#
+# class IHDRChunk(PNGChunk):
+#     def __init__(self):
+#
+#
+#
+# class PNGFile(object):
+#     def __init__(self):
+#         self._filepath = str()
+#         self._width = int()
+#         self._height = int()
+#         self._bit_depth = int()
+#         self._color_type = int()
+#         self._compression_method = int()
+#
+
+
 def open_file(filepath):
     if (os.path.isfile(filepath) is False): raise ValueError()
 
@@ -41,15 +111,13 @@ def type_to_eng(type_hex):
         "70485973" : "pHYs",
         "73504c54" : "sPLT",
         "74494d45" : "tIME",
-
     }
 
     return mapping.get(type_hex, None)
 
-def byte_to_hex(bytes):
-    d = binascii.hexlify(bytes)
-    return []
+
 def break_into_chunks(data):
+    # TODO : consider using a buffer or StringIO
 
     # PNG's begin with an identifier. If this has not yet been stripped,
     # we should remove it
@@ -97,10 +165,92 @@ def break_into_chunks(data):
 
     return png
 
+def process_IHDR(hex_str):
+    hex_str = hex_str.replace(" ", "").strip()
+
+    # Image Width (px)
+    # four bytes
+    width = hex_str[:8]
+    hex_str = hex_str[8:]
+
+    # Image Height (px)
+    # four bytes
+    height = hex_str[:8]
+    hex_str = hex_str[8:]
+
+    # Bit Depth
+    # 1 bytes
+    bit_depth = hex_str[:2]
+    hex_str = hex_str[2:]
+
+    # Color Type
+    # 1 byte
+    # e.g. Greyscale, TrueColor, TrueColor w/ alpha
+    color_type = hex_str[:2]
+    hex_str = hex_str[2:]
+
+    # Compression Method
+    # 1 byte
+    compression_method = hex_str[:2]
+    hex_str = hex_str[2:]
+
+    # Filter Method
+    # 1 byte
+    filter_method = hex_str[:2]
+    hex_str = hex_str[2:]
+
+    # Interlace method
+    # 1 byte
+    interlace_method = hex_str[:2]
+    hex_str = hex_str[2:]
+
+    return {
+        "width" : int(width, 16),
+        "height" : int(height, 16),
+        "bit_depth" : int(bit_depth, 16),
+        "color_type" : int(color_type, 16),
+        "compression_method" : int(compression_method, 16),
+        "filter_method" : int(filter_method, 16),
+        "interlace_method" : int(interlace_method, 16),
+    }
+
+def process_IDAT(hex_str):
+
+    # Compression Method
+    # 1 byte
+    # "8" indicates "DEFLATE" compression
+    compression_method = hex_str[:2]
+    hex_str[2:]
+
+    # Additional Flag
+    # 1 byte
+    # for compression_method = 8:
+    # addl_flag = log2(LZ77 window size) - 8
+    addl_flag = hex_str[:2]
+    hex_str[2:]
+
+    # Compressed Data Blocks
+    # n bytes
+    data_blocks = hex_str[:-4]
+    hex_str = [-4:]
+
+    # Check Value
+    # 4 bytes
+    check_value = hex_str[:4]
+    hex_str = hex_str[4:]
+
+    return {
+        "compression_method" : int(compression_method, 16),
+        "addl_flag" : int(addl_flag, 16),
+        "data_blocks" : data_blocks,
+        "check_value" : check_value
+    }
+
 if __name__ == "__main__":
     fp = "/Users/LukeGilson/misc_scripts/png/test_png_1px.png"
     data = open_file(fp)
     k = break_into_chunks(data)
+    k["49484452"].update(process_IHDR(k["49484452"]["data"]))
     for i in k:
         print "=== {} ===".format(i)
         for j in k[i]:
