@@ -26,6 +26,8 @@ no : 3.1389941145
 
     - add more sources: m-w.com, oed.com, wiktionary, a thesaurus
     - refine stop words based on overall distribution of words in a datasource
+    - move from ranking 1-grams to n-grams, and determine which gives the
+        best results
 
 ## Next steps
     So what now, given we have a ranked list of words?
