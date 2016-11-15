@@ -1,7 +1,24 @@
 
 
 class HuffByte(object):
-    def __init__(self, value="", encoded_value=int(), frequency=int()):
+    """ a data object representing a byte, its encoding, and its frequency
+        in a given document
+    """
+    def __init__(self, value=bytes(), encoded_value=int(), frequency=float()):
+        """
+            value
+                @type - bytes
+                @param - the byte found in a source document
+
+            encoded_value
+                @type - int
+                @param - the integer given as the byte value by the huffman
+                         tree.
+
+            frequency
+                @type - float
+                @param - (# times this byte appears) / (total bytes in doc)
+        """
         self.value = value,
         self.encoded_value = encoded_value
         self.frequency = frequency
@@ -57,55 +74,96 @@ class Node(object):
 
 
 class HuffmanTree(object):
-    """ A Huffman Tree, comprised of a mapping of byte-values to encodings
-        and a tree, a root Node. Left turns are 1, right turns are 0
+    """ A Huffman Tree, comprised of (i) a mapping of byte-values to encodings
+        and (ii) a pointer to a tree's root Node. Left turns are 1, right turns are 0
 
-        The two attributes either return themselves, or try to build themselves
-        out of the other attribute
+        The two attributes either return themselves, try to build themselves
+        out of the other attribute, or return None
     """
     def __init__(self):
+        """
+        _mapping
+            @type - dic
+            @param - Keys are a byte value (aka Huffbyte.value).
+                     Values are HuffBytes
+
+        _tree
+            @type - Node
+            @param - the root node to a Huffman tree.
+        """
         self._mapping = {}
         self._tree = Node()
 
     @property
     def mapping(self):
+
+        # If we have it, return the mapping
         if (self._mapping):
             return self._mapping
+        # Otherwise, try to build it out of the tree, and return it
         elif (self._tree):
             self.mapping = self._build_mapping()
             return self.mapping
+        # If we can't do anything, just return None
         else:
             return None
 
     @mapping.setter
     def mapping(self, map_dict):
+        """ sets value of `mapping` attribute
+
+            @type - dic
+            @param - {HuffByte.value : HuffByte}
+        """
         self._mapping = map_dict
 
     @property
     def tree(self):
+        # If we have a tree, return it
         if (self._tree):
-            return self._tree
+            r = self._tree
+        # If we don't try to build it out of the mapping and return it
         elif (self._mapping):
             self.tree = self._build_tree()
-            return self.tree
+            r = self.tree
+        # finally, just return None
         else:
-            return None
+            r = None
+
+        return r
 
     @tree.setter
     def tree(self, node):
         self._tree = node
 
     def _build_mapping(self):
+        """ From a Huffman tree, recursively build a mapping of byte values to HuffBytes """
         root_node = self.tree
-
         mapping = {}
         self._get_leaves(root_node, 1, mapping)
         return mapping
 
     def _get_leaves(self, cur_node, path, mapping):
+        """ recursively walk down a tree and get leaves
+
+            cur_node
+                @type - Node
+                @param - a Node. If value is None, then is not a leaf
+
+            path
+                @type - int
+                @param - the current integer representation of the value based on
+                         the huffman tree. All begin with 1
+
+            mapping
+                @type - dic
+                @param - the output dict of {HuffByte.value : HuffByte}
+        """
+
         # we found a leaf
         if (cur_node and cur_node.value):
-            mapping[cur_node.value] = path
+            cur_node.encoded_value = path
+            mapping[cur_node.value] = cur_node
 
         # no leaf found, try to take the left and right branches
         elif (cur_node):
@@ -115,14 +173,54 @@ class HuffmanTree(object):
             self._get_leaves(cur_node.left, l_np, mapping)
             self._get_leaves(cur_node.right, r_np, mapping)
 
-    def _add_leaves(self, prev_node, value, cur_shift):
-        pass
-
     def _build_tree(self):
+        """ From _mapping, build a Huffman Tree of Nodes() """
         root = Node()
         mapping = self.mapping
+        for key in mapping:
+            v = mapping[key]
+            self._add_leaves(root, v.encoded_value.bit_length() - 1, v)
+
+        return root
+
+    def _add_leaves(self, prev_node, cur_shift, leaf_val):
+        """ Recursively build a tree, based on encoded values of a HuffByte
+
+            prev_node
+                @type - Node
+                @param - the node that references the one we walked to
+
+            cur_shift
+                @type - int
+                @param - the nth bit of leaf_val.encoded_value
+
+            leaf_val
+                @type - HuffByte
+                @param - the value we're trying to add to a leaf
+        """
 
 
+        # Ensure that either the right or left node exists (depending on value
+        # of direction). If not, build add it
+        direction = (leaf_val.encoded_value >> cur_shift) & 1
+        cur_shift -= 1
+
+        if (direction == 1 and prev_node.left is None):
+            new_node = Node()
+            prev_node.left = new_node
+
+        elif (direction == 0 and prev_node.right is None):
+            new_node = Node()
+            prev_node.right = new_node
+
+        # BASE CASE - we've reached the bottom of the tree, add leaf_val and return
+        if (cur_shift == 0):
+            new_node.value = leaf_val
+            return
+
+        # Otherwise, take the given branch and recall the function
+        n = prev_node.left if direction else prev_node.right
+        self._add_leaves(n, cur_shift, leaf_val)
 
 class HuffmanBlock(object):
     def __init__(self):
