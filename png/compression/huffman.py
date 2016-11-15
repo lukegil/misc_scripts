@@ -222,6 +222,238 @@ class HuffmanTree(object):
         n = prev_node.left if direction else prev_node.right
         self._add_leaves(n, cur_shift, leaf_val)
 
+
+class EncodeStream(object):
+    def __init__(self):
+        self._raw_stream = bytearray()
+        self._encoded_stream = bytearray()
+        self._huffman_tree = HuffmanTree()
+
+    @property
+    def raw_stream(self):
+        """ the input to be encoded """
+        return self._raw_stream
+
+    @raw_stream.setter
+    def raw_stream(self, stream):
+        """ set the input stream
+
+            @type - bytearray
+            @param - the bytearray to be encoded
+        """
+        self._raw_stream = stream
+
+    @property
+    def encoded_stream(self):
+        """ the encoded output """
+        return self._encoded_stream
+
+    @raw_stream.setter
+    def encoded_stream(self, stream):
+        """ set the input stream
+
+            @type - bytearray
+            @param - the bytearray that was encoded
+        """
+        self._encoded_stream = stream
+
+    def encode(self, sample_size=1.00):
+        huffbytes = build_huffByte_freqs(self.raw_stream, sample_size)
+        node_list = huffBytes_to_Nodes(freqs)
+        node_list = sort_NodeList(node_list)
+        self._huffman_tree = build_huffman_tree(node_list)
+        self.encoded_stream = self._pack_input(self.raw_stream, self._huffman_tree.mapping)
+
+
+    def _pack_input(stream, mapping):
+        output = bytearray()
+        bspace = 7
+        in_byte = 0
+        out_byte = 1
+
+        while stream or cache:
+
+            if (not in_byte and mapping.get(stream[0], None) is None):
+                output.append(stream[0])
+                stream = stream[1:]
+
+            elif (not in_byte):
+                in_byte = mapping.get(stream[0], None)
+
+            # If the entire number excluding the first
+            # bit  will fit in byte, add it
+            l = in_byte.value.bit_length() - 1
+            if (l <= bspace):
+                out_byte = append_to_int(out_byte, in_byte)
+                bspace -= l
+                in_byte = 0
+                cur_stream = cur_stream[1:]
+
+            else:
+                # Get left n bits, add to out_byte, and push
+                # to output
+                shift = in_byte.bit_length() - bspace
+                b = in_byte >> shift
+                out_byte = append_to_int(out_byte, b)
+                output.append(out_byte)
+
+                # Take the untouched bits, and prepend a 1
+                mask = (1 << shift) - 1
+                in_byte &= mask
+                in_byte |= (1 << shift)
+
+                # Next loop will start a new byte
+                out_byte = 1
+                bspace = 7
+
+        return output
+
+    def decode(self):
+        pass
+
+
+
+def build_huffByte_freqs(byte_stream, sample_size=1.00):
+    """ Returns list of HuffBytes with frequencies set
+
+        byte_stream
+            @type - bytearray
+            @param - the raw data
+
+        sample_size
+            @type - float
+            @param - what percent of the data to review for frequencies
+    """
+    up_to = len(byte_stream) * sample_perc
+    byte_stream = byte_stream[:int(up_to)]
+    freq_tbl = {}
+    max_freq = 0
+    for byte in byte_stream:
+        try:
+            freq_tbl[byte].frequency += 1/up_to
+
+        except KeyError:
+            b = HuffByte(value = byte, frequency = 1/up_to)
+            freq_tbl[byte] = b
+
+    return values(freq_tbl)
+
+def huffBytes_to_Nodes(hb_list):
+    return [hb_to_node(hb) for hb in hb_list]
+
+def hb_to_node(hb):
+    new_node = Node()
+    new_node.value = hb
+    return new_node
+
+def sort_NodeList(node_list, pivot=None):
+    """ Sort a set of Nodes with HuffByte values into desc by frequency using quicksort """
+    if (len(node_list) <= 1):
+        return node_list
+
+    if (pivot is None):
+        pivot = node_list[len(node_list)/2].value.frequency
+
+    smaller = []
+    larger = []
+    for i in range(pivot):
+        n = hb_list[pivot]
+        if (n.value.frequency < p):
+            smaller.append(n)
+        else:
+            larger.append(n)
+
+    return sort_HuffBytes([larger]) + sort_HuffBytes([smaller])
+
+def insert_to_NodeList(node, node_list):
+    """ Insert a new Node into huff_tbl sorted by probability DESC
+
+        node - @type - tuple
+             - @param - (Node, probability)
+
+        node_list - @type - list
+                 - @param - list of `tupe`s
+
+        Insert into huff_tbl using binary-search insert, since
+        insertion is being done asyncronously. Ordered desc to
+        optimize for pop()s
+    """
+    found = False
+    lwr = 0
+    upr = len(node_list) - 1
+    while not found:
+        mid = (upr + lwr) // 2
+        freq = node.frequency
+
+        # empty table
+        if (not node_list):
+            found = True
+            i_at = 0
+
+        # Found midpoint
+        elif ((upr - lwr) <= 1 and node_list[lwr][1] > freq > node_list[upr][1]):
+            found = True
+            i_at = upr
+
+        # `prob` smaller than any in tbl
+        elif (node_list[upr][1] >= freq):
+            found = True
+            i_at = upr + 1
+
+        # `prob` larger than any in tbl
+        elif (freq >= node_list[lwr][1]):
+            found = True
+            i_at = lwr
+
+        # `prob` is midpoint
+        elif (freq == node_list[mid][1]):
+            found = True
+            i_at = mid
+
+        # prob is between lower and mid
+        elif (node_list[lwr][1] > freq > node_list[mid][1]):
+            upr = mid
+
+        #prob is between mid and upper
+        elif (node_list[mid][1] > freq > node_list[upr][1]):
+            lwr = mid
+
+    node_list.insert(i_at, node)
+    return node_list
+
+def build_huffman_tree(node_list):
+    """ Returns a HuffmanTree object
+
+        @type - {}
+        @param - the bytestream to
+        """
+    while (len(node_list) > 1):
+        n1 = node_list.pop()
+        n2 = node_list.pop()
+
+        new_node = Node()
+        new_node.value.frequency = n1.frequency + n2.frequency
+        node_list = insert_to_NodeList(new_node, node_list)
+
+    HT = HuffmanTree()
+    HT.tree = node_list[0]
+    return HT
+
+def append_to_int(int1, int2):
+    """ bitwise append int2 to int1 and return
+        NB: int2 has preceding 1 that should be stripped
+    """
+    l = int2.bit_length() - 1
+    int1 <<= l
+
+    int2 = int2 ^ (1 << l)
+    int1 |= int2
+
+    return int1
+
+
+
+
 class HuffmanBlock(object):
     def __init__(self):
         self._raw_stream = bytearray()
@@ -291,8 +523,6 @@ class HuffmanBlock(object):
         encoded_stream = self.pack_string(cur_stream)
 
     def pack_string(self, cur_stream):
-
-
         encoded_stream = bytearray()
         free_in_hex = 7
         cur_byte = 1
@@ -306,8 +536,6 @@ class HuffmanBlock(object):
 
             elif (not self.next_data):
                 self.next_data = self.huffman_table[cur_stream[0]]
-
-
 
             # If the entire number excluding the first
             # bit  will fit in byte, add it
