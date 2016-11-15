@@ -1,10 +1,17 @@
 
 
+class HuffByte(object):
+    def __init__(self, value="", encoded_value=int(), frequency=int()):
+        self.value = value,
+        self.encoded_value = encoded_value
+        self.frequency = frequency
+
+
 class Node(object):
     def __init__(self):
         self._left = None
         self._right = None
-        self._value = None
+        self._value = HuffByte(None, 0, 0)
 
     @property
     def left(self):
@@ -49,6 +56,72 @@ class Node(object):
         self._value = val
 
 
+class HuffmanTree(object):
+    """ A Huffman Tree, comprised of a mapping of byte-values to encodings
+        and a tree, a root Node. Left turns are 1, right turns are 0
+
+        The two attributes either return themselves, or try to build themselves
+        out of the other attribute
+    """
+    def __init__(self):
+        self._mapping = {}
+        self._tree = Node()
+
+    @property
+    def mapping(self):
+        if (self._mapping):
+            return self._mapping
+        elif (self._tree):
+            self.mapping = self._build_mapping()
+            return self.mapping
+        else:
+            return None
+
+    @mapping.setter
+    def mapping(self, map_dict):
+        self._mapping = map_dict
+
+    @property
+    def tree(self):
+        if (self._tree):
+            return self._tree
+        elif (self._mapping):
+            self.tree = self._build_tree()
+            return self.tree
+        else:
+            return None
+
+    @tree.setter
+    def tree(self, node):
+        self._tree = node
+
+    def _build_mapping(self):
+        root_node = self.tree
+
+        mapping = {}
+        self._get_leaves(root_node, 1, mapping)
+        return mapping
+
+    def _get_leaves(self, cur_node, path, mapping):
+        # we found a leaf
+        if (cur_node and cur_node.value):
+            mapping[cur_node.value] = path
+
+        # no leaf found, try to take the left and right branches
+        elif (cur_node):
+            l_np = (path << 1) ^ 1 #append 1
+            r_np = (path << 1) #append 0
+
+            self._get_leaves(cur_node.left, l_np, mapping)
+            self._get_leaves(cur_node.right, r_np, mapping)
+
+    def _add_leaves(self, prev_node, value, cur_shift):
+        pass
+
+    def _build_tree(self):
+        root = Node()
+        mapping = self.mapping
+
 
 
 class HuffmanBlock(object):
@@ -58,6 +131,7 @@ class HuffmanBlock(object):
         self._tbl_root = Node()
         self._freq_tbl = {}
         self._huffman_tbl = {}
+        self.next_data = int()
 
     @property
     def raw_stream(self):
@@ -118,33 +192,34 @@ class HuffmanBlock(object):
         cur_stream = self.raw_stream
         encoded_stream = self.pack_string(cur_stream)
 
-
     def pack_string(self, cur_stream):
+
+
         encoded_stream = bytearray()
         free_in_hex = 7
         cur_byte = 1
         cache = 0
-        while (cur_stream or cache):
+        while (cur_stream or self.next_data):
 
-            if (not cache and not self.huffman_table.get(cur_stream[0])):
+            if (not self.next_data and not self.huffman_table.get(cur_stream[0])):
                 encoded_stream.append(ord(cur_stream[0]))
                 cur_stream = cur_stream[1:]
                 continue
 
-            elif (not cache):
-                encoded_b = self.huffman_table[cur_stream[0]]
+            elif (not self.next_data):
+                self.next_data = self.huffman_table[cur_stream[0]]
 
-            else:
-                encoded_b = cache
-                cache = 0
+
 
             # If the entire number excluding the first
             # bit  will fit in byte, add it
-            l = encoded_b.bit_length() - 1
+            l = self.next_data.bit_length() - 1
             if (l <= free_in_hex):
-                cur_byte = self.append_to_int(cur_byte, encoded_b)
+                cur_byte = self.append_to_int(cur_byte, self.next_data)
 
                 free_in_hex -= l
+
+                self.next_data = 0
 
 
             # otherwise, grab as many bits (assuming big endiness)
@@ -154,29 +229,21 @@ class HuffmanBlock(object):
             else:
                 # Get left n bits, add to cur_byte, and push
                 # to output
-                shift_right = encoded_b.bit_length() - free_in_hex
-                b = encoded_b >> shift_right
+                shift_right = self.next_data.bit_length() - free_in_hex
+                b = self.next_data >> shift_right
                 cur_byte = self.append_to_int(cur_byte, b)
                 encoded_stream.append(cur_byte)
 
                 # Take the untouched bits, and prepend a 1
                 mask = (1 << shift_right) - 1
-                encoded_b &= mask
-                encoded_b |= (1 << shift_right)
-
-                # Add it back to the stream
-                cache = encoded_b
+                self.next_data &= mask
+                self.next_data |= (1 << shift_right)
 
                 # Next loop will start a new byte
                 cur_byte = 1
                 free_in_hex = 7
 
             cur_stream = cur_stream[1:]
-
-        # LAZY, fix
-        if (cur_byte != 1):
-            print("cur_byte : {}".format(cur_byte))
-            encoded_stream.append(cur_byte)
         return encoded_stream
 
     def append_to_int(self, main_int, new_int):
