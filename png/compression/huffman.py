@@ -278,11 +278,7 @@ class EncodeStream(object):
     def encode(self, sample_size=1.00):
         huffbytes = build_huffByte_freqs(self.raw_stream, sample_size)
         node_list = huffBytes_to_Nodes(huffbytes)
-
-        saved = set_recursion_limit(node_list)
         node_list = sort_NodeList(node_list)
-        set_recursion_limit(node_list, saved)
-
         self._huffman_tree = build_huffman_tree(node_list)
         self._huffman_tree.tree_to_mapping()
         self.encoded_stream = self._pack_input(self.raw_stream, self._huffman_tree.mapping)
@@ -433,11 +429,11 @@ def set_recursion_limit(node_list, limit=0):
     return old
 
 
-def sort_NodeList(node_list, pv=None):
+def sort_NodeList(node_list, pv=None, recursion_stats={"num" : 0, "max" : sys.getrecursionlimit() - 1}):
     """ Sort a set of Nodes with HuffByte values into desc by frequency using quicksort """
 
     # Base case
-    if (len(node_list) <= 1):
+    if (len(node_list) <= 1 or recursion_stats["num"] > recursion_stats["max"]):
         return node_list
 
     # calculate the pivot as mean of three
@@ -451,16 +447,19 @@ def sort_NodeList(node_list, pv=None):
     smaller = []
     middle = []
     larger = []
+    low_pv = pv - (pv * 0.05)
+    high_pv = pv + (pv * 0.05)
     for i in range(len(node_list)):
         n = node_list[i]
         # partition the values
-        if (n.value.frequency < pv):
+        if (low_pv <= n.value.frequency <= high_pv):
+            middle.append(n) # to handle equal frequencies
+        elif (n.value.frequency < pv):
             smaller.append(n)
         elif (n.value.frequency > pv):
             larger.append(n)
-        else:
-            middle.append(n) # to handle equal frequencies
 
+    recursion_stats["num"] += 1
     return sort_NodeList(larger) + middle + sort_NodeList(smaller)
 
 def insert_to_NodeList(node, node_list):
